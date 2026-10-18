@@ -1,0 +1,15 @@
+qfest-grader
+Copyright 2026 Qiskit Fall Fest 2026 Warsaw organisers
+
+This product is derived from the Quantum Challenge Grader (qc-grader 2026.9.29),
+https://github.com/qiskit-community/Quantum-Challenge-Grader
+Copyright 2019 IBM and its contributors, licensed under the Apache License, Version 2.0.
+
+Changes from the original:
+- Answers are reduced to final values (counts, numbers, sparse amplitudes,
+  circuit depth and gate positions, stabilizer expectation values) on the client.
+- Participants are identified by a saved email instead of an IBM Quantum API key.
+- Submissions go to the Warsaw grading server instead of IBM's grading API.
+- Only the Warsaw Lab 0 and Lab 1 grading functions are included.
+
+Files derived from the original keep IBM's copyright notice and state the changes.
