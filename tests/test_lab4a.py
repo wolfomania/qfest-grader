@@ -118,6 +118,8 @@ def test_ex3c_compares_the_circuit_with_the_ansatz_of_the_submitted_hamiltonian(
     forward, backward = SparsePauliOp.sum(terms), SparsePauliOp.sum(terms[::-1])
     facts = lab4a._ex3c_answer((backward, qopt.annotated_qaoa_ansatz(backward, reps=2)))
     assert facts["own_ansatz"] is True and facts["num_parameters"] == 4
+    unflattened = qopt.annotated_qaoa_ansatz(backward, reps=2, flatten=False)
+    assert lab4a._ex3c_answer((backward, unflattened))["own_ansatz"] is True
     assert lab4a._ex3c_answer((forward, qopt.annotated_qaoa_ansatz(backward, reps=2)))["own_ansatz"] is False
     assert lab4a._ex3c_answer((forward, QuantumCircuit(4)))["own_ansatz"] is None
 

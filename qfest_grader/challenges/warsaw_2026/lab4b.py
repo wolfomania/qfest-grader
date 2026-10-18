@@ -210,13 +210,24 @@ class GreedyGenerator(np.random.Generator):
 
     def choice(self, a: Any, size: Any = None, replace: bool = True, p: Any = None, axis: int = 0,
                shuffle: bool = True) -> Any:
+        if axis != 0:
+            raise ValueError("GreedyGenerator.choice supports axis=0 only")
         items = np.arange(a) if isinstance(a, (int, np.integer)) else np.asarray(a)
-        weights = np.full(len(items), 1 / len(items)) if p is None else np.asarray(p, dtype=float)
+        count = 1 if size is None else int(np.prod(size))
+        if count == 0:
+            return items[np.zeros(size, dtype=int)]
+        if len(items) == 0:
+            raise ValueError("a cannot be empty unless no samples are taken")
+        raw = np.full(len(items), 1 / len(items)) if p is None else np.asarray(p)
+        weights = raw.astype(float)
         if weights.shape != (len(items),):
             raise ValueError("a and p must have same size")
-        if np.any(weights < 0) or not np.isclose(weights.sum(), 1.0, rtol=0, atol=1e-8):
+        # NumPy's tolerance for the sum of p.
+        atol = np.sqrt(np.finfo(np.float64).eps)
+        if np.issubdtype(raw.dtype, np.floating):
+            atol = max(atol, np.sqrt(np.finfo(raw.dtype).eps))
+        if np.any(weights < 0) or not np.isclose(weights.sum(), 1.0, rtol=0, atol=atol):
             raise ValueError("probabilities are not non-negative or do not sum to 1")
-        count = 1 if size is None else int(np.prod(size))
         if count > len(items):
             raise ValueError("Cannot take a larger sample than population when replace=False")
         chosen = items[np.argsort(-weights, kind="stable")[:count]]
@@ -316,24 +327,27 @@ def _integrals(hcore: Any, eri: Any, nuclear_repulsion_energy: Any) -> tuple[np.
     """The submitted integrals, checked to be the N2 integrals up to an orbital rotation.
 
     Every RHF run may rotate the degenerate pi orbitals differently, so CI strings mean something only in the basis of
-    the integrals they were sampled with. Rotations keep the spectra of hcore and of eri as a matrix.
+    the integrals they were sampled with. A rotation u keeps the spectra of hcore, of eri as a matrix and of
+    eri + hcore x 1 + 1 x hcore; the last one fails when hcore and eri come from different rotations.
     """
     ref_hcore, ref_eri, ref_core, n, _ = _n2_hamiltonian()
     try:
         h, g, core = np.asarray(hcore, dtype=float), np.asarray(eri, dtype=float), float(nuclear_repulsion_energy)
     except (TypeError, ValueError):
         h = g = None
-    if h is None or h.shape != (n, n) or g.shape != (n,) * 4:
+    if (h is None or h.shape != (n, n) or g.shape != (n,) * 4 or not np.all(np.isfinite(h))
+            or not np.all(np.isfinite(g))):
         raise AnswerError(f"Pass hcore ({n} x {n}), eri ({n} x {n} x {n} x {n}) and nuclear_repulsion_energy from the "
                           "cell that builds the N2 Hamiltonian.")
 
-    def spectrum(matrix: np.ndarray) -> np.ndarray:
-        return np.linalg.eigvalsh((matrix + matrix.T) / 2)
+    def spectra(one_body: np.ndarray, two_body: np.ndarray) -> list[np.ndarray]:
+        eye, pairs = np.eye(n), two_body.reshape(n * n, n * n)
+        matrices = (one_body, pairs, pairs + np.kron(one_body, eye) + np.kron(eye, one_body))
+        return [np.linalg.eigvalsh((m + m.T) / 2) for m in matrices]
 
     if not (abs(core - ref_core) <= _INTEGRAL_TOLERANCE
-            and np.allclose(spectrum(h), spectrum(ref_hcore), rtol=0, atol=_INTEGRAL_TOLERANCE)
-            and np.allclose(spectrum(g.reshape(n * n, n * n)), spectrum(ref_eri.reshape(n * n, n * n)), rtol=0,
-                            atol=_INTEGRAL_TOLERANCE)):
+            and all(np.allclose(mine, ref, rtol=0, atol=_INTEGRAL_TOLERANCE)
+                    for mine, ref in zip(spectra(h, g), spectra(ref_hcore, ref_eri)))):
         raise AnswerError("hcore, eri and nuclear_repulsion_energy are not the N2 integrals of this lab. Pass the ones "
                           "from the cell that builds the N2 Hamiltonian.")
     return h, g, core
@@ -368,7 +382,8 @@ def _exbonus_answer(answer: tuple[Any, Any, Any, Any, Any]) -> dict[str, Any]:
     except Exception as err:  # noqa: BLE001
         raise AnswerError(f"Could not diagonalize best_subspace ({short_error(err)}).") from None
     facts["energy"] = round(float(energy), 6)
-    facts["matches"] = abs(float(energy) - claimed) <= _ENERGY_TOLERANCE
+    # A spin-constrained solver (spin_sq=0.0) reports an energy above the lowest one of the subspace, never below.
+    facts["matches"] = claimed >= float(energy) - _ENERGY_TOLERANCE
     return facts
 
 

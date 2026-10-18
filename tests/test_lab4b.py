@@ -1,5 +1,3 @@
-from itertools import combinations, islice
-
 import numpy as np
 import pytest
 
@@ -23,7 +21,7 @@ def test_ex1a_reports_symmetry_start_and_steps():
 
 def test_ex1b_checks_chains_and_transpiles_the_test_circuit():
     pytest.importorskip("qiskit_ibm_runtime")
-    pairs = [(p, p) for p in range(20)]
+    pairs = [(0, 1)] * 20
     facts = lab4b._ex1b_answer((snake(0) + snake(6), pairs, 0))
     assert facts["chain_a"] and facts["chain_b"] and facts["length"] == 52 and facts["num_pairs"] == 20
     assert isinstance(facts["depth2q"], int) and facts["depth2q"] > 0
@@ -66,6 +64,13 @@ def test_greedy_generator_returns_the_most_probable_items():
     with pytest.raises(ValueError, match="non-negative"):
         gen.choice([1, 2], p=[1.5, -0.5])
     assert 0 <= gen.random() < 1
+    p32 = np.arange(1, 9, dtype=np.float32) / np.float32(36)
+    assert abs(p32.astype(float).sum() - 1) > 1e-8 and gen.choice(8, p=p32) == 7
+    assert gen.choice(np.array([], dtype=int), size=0, replace=False).shape == (0,)
+    with pytest.raises(ValueError, match="cannot be empty"):
+        gen.choice([])
+    with pytest.raises(ValueError, match="axis=0"):
+        gen.choice(np.arange(6).reshape(2, 3), axis=1)
 
 
 def recover_lowest(bitstrings, probs, occupancy, num_orbitals, num_elec, rand_seed):
@@ -99,7 +104,8 @@ def test_ex3b_accepts_default_rng_of_rand_seed():
 
 
 def test_ex4_facts_of_the_hf_like_strings():
-    ints = [sum(1 << p for p in c) for c in islice(combinations(range(26), 5), 300)]
+    rng = np.random.default_rng(5)
+    ints = list(dict.fromkeys(int(sum(1 << p for p in rng.choice(26, 5, replace=False))) for _ in range(400)))[:300]
     facts = lab4b._ex4_answer(np.array([ints, ints]))
     assert facts["shape"] == [2, 300] and facts["rows_equal"] and facts["popcounts"] == [5]
     assert facts["ascending"] is False and lab4b._ex4_answer(np.sort([ints, ints]))["ascending"] is True
@@ -144,10 +150,25 @@ def test_exbonus_computes_in_the_basis_of_the_submitted_integrals(integrals):
     energy = solve_sci((strings, strings), *rotated[:2], 26, (5, 5)).energy + core
     assert abs(energy - (solve_sci((strings, strings), hcore, eri, 26, (5, 5)).energy + core)) > 1e-3
     assert lab4b._exbonus_answer((energy, (strings, strings), *rotated))["matches"] is True
-    with pytest.raises(AnswerError, match="not the N2 integrals"):
-        lab4b._exbonus_answer((energy, (strings, strings), 1.01 * hcore, eri, core))
+    for mixed in ((1.01 * hcore, eri, core), (hcore, rotated[1], core), (rotated[0], eri, core)):
+        with pytest.raises(AnswerError, match="not the N2 integrals"):
+            lab4b._exbonus_answer((energy, (strings, strings), *mixed))
     with pytest.raises(AnswerError, match="Pass hcore"):
         lab4b._exbonus_answer((energy, (strings, strings), hcore, eri[0], core))
+
+
+def test_exbonus_accepts_energies_above_the_lowest_one_of_the_subspace(integrals):
+    from qiskit_addon_sqd.fermion import solve_sci
+
+    hcore, eri, core = integrals
+    hf = 0b11111
+    alpha = np.array(sorted({hf} | {hf ^ (1 << i) ^ (1 << j) for i in (3, 4) for j in (5, 6)}))
+    beta = np.array(sorted({hf} | {hf ^ (1 << i) ^ (1 << j) for i in (2, 3, 4) for j in (5, 6)}))
+    lowest = solve_sci((alpha, beta), hcore, eri, 26, (5, 5)).energy + core
+    singlet = solve_sci((alpha, beta), hcore, eri, 26, (5, 5), spin_sq=0.0).energy + core
+    assert singlet > lowest + 1e-3
+    assert lab4b._exbonus_answer((singlet, (alpha, beta), *integrals))["matches"] is True
+    assert lab4b._exbonus_answer((lowest - 1e-3, (alpha, beta), *integrals))["matches"] is False
 
 
 @pytest.mark.parametrize("strings, error", [

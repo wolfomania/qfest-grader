@@ -262,6 +262,7 @@ def _own_ansatz(hamiltonian: Any, bound: Any) -> bool:
     """Whether the bound circuit has the state of annotated_qaoa_ansatz(hamiltonian, reps=2) at the fixed values.
 
     The XX, YY and ZZ terms do not commute, so the ansatz depends on the term order of the submitted Hamiltonian.
+    PauliEvolution gates (flatten=False) are simulated as their Lie-Trotter circuits, which flatten=True builds.
     """
     try:
         from qopt_best_practices.circuit_library import annotated_qaoa_ansatz
@@ -269,10 +270,13 @@ def _own_ansatz(hamiltonian: Any, bound: Any) -> bool:
         raise AnswerError("grade_lab4a_ex3c needs qopt_best_practices: install it and run the Imports cell.") from None
     from qiskit.quantum_info import Statevector
 
+    def state(circuit: Any) -> Statevector:
+        return Statevector(circuit.remove_final_measurements(inplace=False).decompose(
+            gates_to_decompose=["PauliEvolution"]))
+
     try:
         _, expected = _bound_circuit(annotated_qaoa_ansatz(hamiltonian, reps=_PCE_REPS), "the QAOA ansatz")
-        overlap = Statevector(expected.remove_final_measurements(inplace=False)).inner(
-            Statevector(bound.remove_final_measurements(inplace=False)))
+        overlap = state(expected).inner(state(bound))
     except Exception:  # noqa: BLE001 - reported as a mismatch
         return False
     return bool(abs(overlap) ** 2 > 1 - 1e-6)
