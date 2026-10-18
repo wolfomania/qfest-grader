@@ -111,25 +111,49 @@ def test_ex4_facts_of_the_hf_like_strings():
 
 def test_exbonus_skips_oversized_subspaces():
     big = np.arange(301)
-    assert lab4b._exbonus_answer((-108.8, (big, big))) == {"dims": [301, 301], "energy": None, "matches": False}
+    assert lab4b._exbonus_answer((-108.8, (big, big), None, None, 0.0)) == {"dims": [301, 301], "energy": None,
+                                                                           "matches": False}
     with pytest.raises(AnswerError, match="integer array"):
-        lab4b._exbonus_answer((-108.8, (np.array([1.5]), np.array([1]))))
+        lab4b._exbonus_answer((-108.8, (np.array([1.5]), np.array([1])), None, None, 0.0))
 
 
-def test_exbonus_recomputes_the_hartree_fock_energy():
+@pytest.fixture(scope="module")
+def integrals():
     pytest.importorskip("pyscf")
     pytest.importorskip("qiskit_addon_sqd")
+    hcore, eri, core, *_ = lab4b._n2_hamiltonian()
+    return hcore, eri, core
+
+
+def test_exbonus_recomputes_the_hartree_fock_energy(integrals):
     hf = np.array([31])
-    facts = lab4b._exbonus_answer((-108.330583, (hf, hf)))
+    facts = lab4b._exbonus_answer((-108.330583, (hf, hf), *integrals))
     assert facts["dims"] == [1, 1] and facts["matches"] and abs(facts["energy"] + 108.330583) < 1e-5
+
+
+def test_exbonus_computes_in_the_basis_of_the_submitted_integrals(integrals):
+    from qiskit_addon_sqd.fermion import solve_sci
+
+    hcore, eri, core = integrals
+    # Another RHF run may return the degenerate orbitals 5 and 6 rotated and orbital 2 with the other sign.
+    u = np.eye(26)
+    u[5:7, 5:7] = [[np.cos(0.4), -np.sin(0.4)], [np.sin(0.4), np.cos(0.4)]]
+    u[2, 2] = -1
+    rotated = (u.T @ hcore @ u, np.einsum("pqrs,pi,qj,rk,sl->ijkl", eri, u, u, u, u, optimize=True), core)
+    strings = np.array([0b11111, 0b101111])
+    energy = solve_sci((strings, strings), *rotated[:2], 26, (5, 5)).energy + core
+    assert abs(energy - (solve_sci((strings, strings), hcore, eri, 26, (5, 5)).energy + core)) > 1e-3
+    assert lab4b._exbonus_answer((energy, (strings, strings), *rotated))["matches"] is True
+    with pytest.raises(AnswerError, match="not the N2 integrals"):
+        lab4b._exbonus_answer((energy, (strings, strings), 1.01 * hcore, eri, core))
+    with pytest.raises(AnswerError, match="Pass hcore"):
+        lab4b._exbonus_answer((energy, (strings, strings), hcore, eri[0], core))
 
 
 @pytest.mark.parametrize("strings, error", [
     ([47, 31], "ascending"), ([31, 31, 47], "ascending"), ([7], "5 of the 26"), ([-31], "5 of the 26"),
     ([31 << 22], "5 of the 26"),
 ])
-def test_exbonus_rejects_invalid_ci_strings(strings, error):
-    pytest.importorskip("pyscf")
-    pytest.importorskip("qiskit_addon_sqd")
+def test_exbonus_rejects_invalid_ci_strings(integrals, strings, error):
     with pytest.raises(AnswerError, match=error):
-        lab4b._exbonus_answer((-108.3, (np.array(strings), np.array([31]))))
+        lab4b._exbonus_answer((-108.3, (np.array(strings), np.array([31])), *integrals))

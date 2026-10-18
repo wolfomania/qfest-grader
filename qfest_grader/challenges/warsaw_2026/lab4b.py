@@ -14,7 +14,7 @@
 # on FakeMiami and the 2-qubit depth of IBM's controlled-phase test circuit,
 # outputs of the participant's functions on deterministic test inputs (a greedy
 # stand-in generator makes Exercise 3b independent of the NumPy version), and the
-# bonus energy recomputed from the submitted subspace.
+# bonus energy recomputed from the submitted subspace and integrals.
 
 """Qiskit Fall Fest 2026 Warsaw, Lab 4b: grading functions."""
 
@@ -37,6 +37,8 @@ _NUM_ORBITALS = 26
 _TEST_SEED = 2026
 _MAX_SUBSPACE = 300
 _ENERGY_TOLERANCE = 1e-4
+# Integrals from another RHF run differ by an orbital rotation; their spectra agree to about 1e-14.
+_INTEGRAL_TOLERANCE = 1e-6
 # Controlled-phase angles of IBM's Exercise 1b test circuit (qc_grader qgss_2026 lab4c.py).
 _CP_ANGLES = (
     -1.52450963e00, -1.51845886e00, -7.65931488e-01, -2.66798027e-02, -1.51732558e-02, 5.37571952e-02,
@@ -285,7 +287,7 @@ def grade_lab4b_ex4(hf_like_ci_strings: Any) -> None:
 
 @lru_cache(maxsize=1)
 def _n2_hamiltonian() -> tuple[Any, Any, float, int, tuple[int, int]]:
-    """Active-space integrals of N2 (cc-pVDZ, 2.0 Å, 2 frozen orbitals), as notebook cell 8 builds them."""
+    """Active-space integrals of N2 (cc-pVDZ, 2.0 Å, 2 frozen orbitals), as notebook cell 9 builds them."""
     import pyscf
     import pyscf.mcscf
 
@@ -310,8 +312,35 @@ def _ci_strings(values: Any, what: str) -> np.ndarray:
     return array.astype(np.int64)
 
 
-def _exbonus_answer(answer: tuple[Any, Any]) -> dict[str, Any]:
-    best_energy, best_subspace = answer
+def _integrals(hcore: Any, eri: Any, nuclear_repulsion_energy: Any) -> tuple[np.ndarray, np.ndarray, float]:
+    """The submitted integrals, checked to be the N2 integrals up to an orbital rotation.
+
+    Every RHF run may rotate the degenerate pi orbitals differently, so CI strings mean something only in the basis of
+    the integrals they were sampled with. Rotations keep the spectra of hcore and of eri as a matrix.
+    """
+    ref_hcore, ref_eri, ref_core, n, _ = _n2_hamiltonian()
+    try:
+        h, g, core = np.asarray(hcore, dtype=float), np.asarray(eri, dtype=float), float(nuclear_repulsion_energy)
+    except (TypeError, ValueError):
+        h = g = None
+    if h is None or h.shape != (n, n) or g.shape != (n,) * 4:
+        raise AnswerError(f"Pass hcore ({n} x {n}), eri ({n} x {n} x {n} x {n}) and nuclear_repulsion_energy from the "
+                          "cell that builds the N2 Hamiltonian.")
+
+    def spectrum(matrix: np.ndarray) -> np.ndarray:
+        return np.linalg.eigvalsh((matrix + matrix.T) / 2)
+
+    if not (abs(core - ref_core) <= _INTEGRAL_TOLERANCE
+            and np.allclose(spectrum(h), spectrum(ref_hcore), rtol=0, atol=_INTEGRAL_TOLERANCE)
+            and np.allclose(spectrum(g.reshape(n * n, n * n)), spectrum(ref_eri.reshape(n * n, n * n)), rtol=0,
+                            atol=_INTEGRAL_TOLERANCE)):
+        raise AnswerError("hcore, eri and nuclear_repulsion_energy are not the N2 integrals of this lab. Pass the ones "
+                          "from the cell that builds the N2 Hamiltonian.")
+    return h, g, core
+
+
+def _exbonus_answer(answer: tuple[Any, Any, Any, Any, Any]) -> dict[str, Any]:
+    best_energy, best_subspace, hcore, eri, nuclear_repulsion_energy = answer
     try:
         claimed = float(best_energy)
         strings_a, strings_b = best_subspace
@@ -324,7 +353,8 @@ def _exbonus_answer(answer: tuple[Any, Any]) -> dict[str, Any]:
         return facts
     from qiskit_addon_sqd.fermion import solve_sci
 
-    hcore, eri, core_energy, num_orbitals, nelec = _n2_hamiltonian()
+    *_, num_orbitals, nelec = _n2_hamiltonian()
+    h, g, core = _integrals(hcore, eri, nuclear_repulsion_energy)
     for i, strings in enumerate((strings_a, strings_b)):
         if np.any(np.diff(strings) <= 0):
             raise AnswerError(f"best_subspace[{i}] must hold distinct CI strings in ascending order (np.unique).")
@@ -334,7 +364,7 @@ def _exbonus_answer(answer: tuple[Any, Any]) -> dict[str, Any]:
                               "orbitals occupied.")
     print("Recomputing the energy of best_subspace (up to two minutes)...")
     try:
-        energy = solve_sci((strings_a, strings_b), hcore, eri, num_orbitals, nelec).energy + core_energy
+        energy = solve_sci((strings_a, strings_b), h, g, num_orbitals, nelec).energy + core
     except Exception as err:  # noqa: BLE001
         raise AnswerError(f"Could not diagonalize best_subspace ({short_error(err)}).") from None
     facts["energy"] = round(float(energy), 6)
@@ -342,6 +372,8 @@ def _exbonus_answer(answer: tuple[Any, Any]) -> dict[str, Any]:
     return facts
 
 
-def grade_lab4b_exbonus(best_energy: Any, best_subspace: Any) -> None:
-    """Grade the bonus: the N2 energy of the submitted subspace, recomputed here; scored by tiers."""
-    grade_answer((best_energy, best_subspace), _LAB, "exbonus", reduce=_exbonus_answer)
+def grade_lab4b_exbonus(best_energy: Any, best_subspace: Any, hcore: Any, eri: Any,
+                        nuclear_repulsion_energy: Any) -> None:
+    """Grade the bonus: the N2 energy of best_subspace, recomputed here with your integrals; scored by tiers."""
+    grade_answer((best_energy, best_subspace, hcore, eri, nuclear_repulsion_energy), _LAB, "exbonus",
+                 reduce=_exbonus_answer)

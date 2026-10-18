@@ -46,7 +46,7 @@ Each grade call sends your email and a small summary of your answer to the gradi
 
 Source code and notebook contents are never sent. The email is stored in `~/.qfest/grader.json`, readable only by you.
 
-Some checks run on your machine before sending. Lab 4a Exercise 3c compares your circuit with `annotated_qaoa_ansatz` of your Hamiltonian. Lab 4b Exercise 1b transpiles a test circuit on `FakeMiami`. The Lab 4b bonus recomputes the energy of your subspace, which takes up to two minutes.
+Some checks run on your machine before sending. Lab 4a Exercise 3c compares your circuit with `annotated_qaoa_ansatz` of your Hamiltonian. Lab 4b Exercise 1b transpiles a test circuit on `FakeMiami`. The Lab 4b bonus recomputes the energy of your subspace with your `hcore` and `eri`, which takes up to two minutes.
 
 ## Develop
 
