@@ -91,7 +91,7 @@ def grade_answer(
     if not _is_grade_response(response):
         print(
             "The grading server returned an unexpected response. Update the grader with "
-            '%pip install -U "qfest-grader @ https://github.com/wolfomania/qfest-grader/archive/refs/heads/main.zip"'
+            "%pip install -U qfest-grader"
         )
         return
     print(determine_grade_response(passed=response["passed"], score=response["score"], msg=response["msg"]))

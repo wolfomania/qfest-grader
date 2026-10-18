@@ -7,10 +7,10 @@ Grader client for the Qiskit Fall Fest 2026 Warsaw lab notebooks. It checks your
 Run in a notebook cell (Google Colab, Jupyter or VS Code), then restart the kernel:
 
 ```python
-%pip install -q "qfest-grader @ https://github.com/wolfomania/qfest-grader/archive/refs/heads/main.zip"
+%pip install -q qfest-grader
 ```
 
-The install needs Python 3.9 or later and does not need git.
+The install needs Python 3.9 or later. Update an existing install with `%pip install -U qfest-grader`.
 
 ## Use
 
@@ -48,6 +48,8 @@ Circuit source code and notebook contents are never sent. The email is stored in
 pip install -e ".[test]"
 pytest
 ```
+
+Releases go to [PyPI](https://pypi.org/project/qfest-grader/) from GitHub Actions: set the same version in `pyproject.toml` and `qfest_grader/__init__.py`, push, then push the tag `v<version>`.
 
 ## Licence
 
