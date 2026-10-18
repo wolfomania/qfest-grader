@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qfest-grader"
-version = "0.1.2"
+version = "0.2.0"
 description = "Grader client for the Qiskit Fall Fest 2026 Warsaw lab notebooks"
 readme = "README.md"
 license = "Apache-2.0"
@@ -18,6 +18,8 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest>=7"]
+# Libraries some lab grade functions import when they run; the tests use them when present.
+labs = ["qiskit-ibm-runtime>=0.40", "samplomatic>=0.20"]
 
 [project.urls]
 Source = "https://github.com/wolfomania/qfest-grader"

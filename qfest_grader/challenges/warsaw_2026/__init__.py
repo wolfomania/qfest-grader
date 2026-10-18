@@ -8,8 +8,8 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 #
-# Modified in 2026 by the Qiskit Fall Fest 2026 Warsaw organisers: Lab 0 and
-# Lab 1 of the Warsaw labs; progress comes from the Warsaw grading server.
+# Modified in 2026 by the Qiskit Fall Fest 2026 Warsaw organisers: grading
+# functions of the Warsaw labs; progress comes from the Warsaw grading server.
 
 """Qiskit Fall Fest 2026 Warsaw: grading functions."""
 
@@ -30,6 +30,22 @@ from .lab1 import (
     grade_lab1_ex6,
     grade_lab1_ex7,
 )
+from .lab2 import (
+    grade_lab2_ex1,
+    grade_lab2_ex2,
+    grade_lab2_ex3,
+    grade_lab2_ex4,
+    grade_lab2_ex5,
+    grade_lab2_ex6,
+    grade_lab2_ex7,
+)
+from .lab3 import (
+    grade_lab3_ex1,
+    grade_lab3_ex2,
+    grade_lab3_ex3,
+    grade_lab3_ex4,
+    grade_lab3_ex5,
+)
 
 check_progress = create_check_progress_function()
 
@@ -46,4 +62,16 @@ __all__ = [
     "grade_lab1_ex5",
     "grade_lab1_ex6",
     "grade_lab1_ex7",
+    "grade_lab2_ex1",
+    "grade_lab2_ex2",
+    "grade_lab2_ex3",
+    "grade_lab2_ex4",
+    "grade_lab2_ex5",
+    "grade_lab2_ex6",
+    "grade_lab2_ex7",
+    "grade_lab3_ex1",
+    "grade_lab3_ex2",
+    "grade_lab3_ex3",
+    "grade_lab3_ex4",
+    "grade_lab3_ex5",
 ]
