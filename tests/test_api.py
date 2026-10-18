@@ -76,3 +76,15 @@ def test_call_rpc_reports_network_failure_after_retries(monkeypatch, no_sleep):
 def test_call_rpc_rejects_nan():
     with pytest.raises(ValueError):
         call_rpc("qf_submit", {"x": float("nan")})
+
+
+def test_call_rpc_rejects_a_reply_that_is_not_json(monkeypatch):
+    monkeypatch.setattr(api.requests, "post", lambda *a, **k: FakeResponse(200, None))
+    with pytest.raises(GraderError, match="invalid reply"):
+        call_rpc("qf_submit", {})
+
+
+def test_call_rpc_handles_error_bodies_that_are_not_objects(monkeypatch):
+    monkeypatch.setattr(api.requests, "post", lambda *a, **k: FakeResponse(500, ["oops"], reason="Server Error"))
+    with pytest.raises(GraderError, match="500: Server Error"):
+        call_rpc("qf_submit", {})

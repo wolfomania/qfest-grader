@@ -1,5 +1,6 @@
 import pytest
 from qiskit import QuantumCircuit
+from qiskit.quantum_info import Statevector
 
 from qfest_grader import check_progress, save_account
 from qfest_grader.api import GraderError
@@ -129,3 +130,23 @@ def test_check_progress_all_labs(account, capsys):
 
 def test_progress_for_unknown_lab():
     assert "No lab named" in determine_progress_response({"per_lab": []}, lab_name="lab9")
+
+
+def test_unreadable_answer_is_reported_without_network(account, capsys):
+    grade_lab0_ex4({"not": "a state"})
+    assert account.calls == []
+    out = capsys.readouterr().out
+    assert "Not quite! Your answer could not be read" in out
+
+
+def test_check_progress_rejects_incomplete_reply(account, capsys):
+    account.reply = {"per_lab": []}
+    check_progress()
+    assert "unexpected response" in capsys.readouterr().out
+
+
+def test_oversized_answer_is_refused_without_network(account, capsys, monkeypatch):
+    monkeypatch.setattr("qfest_grader.grade._MAX_ANSWER_BYTES", 10)
+    grade_lab0_ex4(Statevector.from_label("000000"))
+    assert account.calls == []
+    assert "Your answer is too large to submit" in capsys.readouterr().out

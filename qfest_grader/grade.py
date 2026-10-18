@@ -27,7 +27,7 @@ from qfest_grader.answers import AnswerError
 from qfest_grader.api import GraderError, call_rpc
 
 # Payload limit; the server enforces its own limit too.
-_MAX_ANSWER_BYTES = 128 * 1024
+_MAX_ANSWER_BYTES = 64 * 1024
 
 
 def _client_tag() -> str:
@@ -84,8 +84,8 @@ def grade_answer(
     except (AccountError, GraderError) as err:
         print(f"Failed: {err}")
         return
-    except ValueError as err:
-        print(f"Failed: your answer could not be encoded ({err}).")
+    except (TypeError, ValueError) as err:
+        print(determine_grade_response(passed=False, score=0, msg=f"Your answer could not be read ({err})."))
         return
 
     if not _is_grade_response(response):
@@ -122,7 +122,11 @@ def _check_progress(lab_name: Optional[str] = None) -> None:
     except (AccountError, GraderError) as err:
         print(f"Failed: {err}")
         return
-    if not isinstance(response, dict) or not isinstance(response.get("per_lab"), list):
+    if (
+        not isinstance(response, dict)
+        or not isinstance(response.get("per_lab"), list)
+        or not isinstance(response.get("challenge_aggregate"), dict)
+    ):
         print("The grading server returned an unexpected response.")
         return
     print(determine_progress_response(response, lab_name=lab_name))

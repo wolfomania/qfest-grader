@@ -60,16 +60,20 @@ def call_rpc(function: str, body: dict[str, Any]) -> Any:
             time.sleep(1 + attempt)
             continue
         if response.status_code == 200:
-            return response.json()
+            try:
+                return response.json()
+            except ValueError:
+                raise GraderError("The grading server returned an invalid reply. Run the cell again.") from None
         raise GraderError(_error_text(response))
     raise GraderError("The grading server did not answer.")  # pragma: no cover
 
 
 def _error_text(response: requests.Response) -> str:
     try:
-        detail = response.json().get("message")
+        body = response.json()
     except ValueError:
-        detail = None
+        body = None
+    detail = body.get("message") if isinstance(body, dict) else None
     if not detail:
         detail = response.reason or "unexpected response"
     return f"The grading server returned {response.status_code}: {detail}"

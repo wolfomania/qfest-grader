@@ -162,3 +162,41 @@ def test_ghz_stabilizer_answer_reports_non_clifford_gates():
     qc = QuantumCircuit(2)
     qc.t(0)
     assert "error" in ghz_stabilizer_answer(qc)
+
+
+def test_circuit_facts_expands_custom_gates():
+    inner = QuantumCircuit(3)
+    inner.h(0)
+    inner.cx(0, 1)
+    inner.cx(1, 2)
+    qc = QuantumCircuit(3)
+    qc.append(inner.to_gate(), [0, 1, 2])
+    facts = circuit_facts(qc)
+    assert facts["multi"] == [[0, 1], [1, 2]]
+    assert facts["depth"] == 3
+
+
+def test_circuit_state_answer_counts_the_real_depth_of_state_preparation():
+    qc = QuantumCircuit(2)
+    qc.initialize([0, 2**-0.5, 2**-0.5, 0], [0, 1])
+    answer = circuit_state_answer(qc)
+    assert answer["depth"] > 1
+    assert answer["amps"] == [[1, pytest.approx(2**-0.5), 0.0], [2, pytest.approx(2**-0.5), 0.0]]
+
+
+def test_circuit_facts_rejects_gates_without_definition():
+    from qiskit.circuit import Gate
+
+    qc = QuantumCircuit(2)
+    qc.append(Gate("mystery", 2, []), [0, 1])
+    with pytest.raises(AnswerError, match="mystery"):
+        circuit_facts(qc)
+
+
+def test_circuit_facts_rejects_too_many_multi_qubit_gates(monkeypatch):
+    monkeypatch.setattr(answers, "MAX_GATES", 3)
+    qc = QuantumCircuit(2)
+    for _ in range(4):
+        qc.cx(0, 1)
+    with pytest.raises(AnswerError, match="more than 3"):
+        circuit_facts(qc)

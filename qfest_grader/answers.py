@@ -16,6 +16,7 @@ from __future__ import annotations
 import math
 import numbers
 from collections.abc import Mapping
+from functools import lru_cache
 from typing import Any
 
 import numpy as np
@@ -25,6 +26,7 @@ MAX_AMPLITUDES = 1024
 MAX_GATES = 2000
 AMPLITUDE_CUTOFF = 1e-9
 _SKIPPED_OPS = {"barrier", "measure", "delay", "reset"}
+_MAX_EXPAND_ROUNDS = 10
 
 
 class AnswerError(ValueError):
@@ -111,14 +113,59 @@ def statevector_answer(state: Any) -> dict[str, Any]:
     return {"num_qubits": num_qubits, "amps": amps}
 
 
+@lru_cache(maxsize=1)
+def _standard_gate_names() -> frozenset[str]:
+    from qiskit.circuit.library import get_standard_gate_name_mapping
+
+    return frozenset(get_standard_gate_name_mapping())
+
+
+def _custom_operations(circuit: Any) -> set[str]:
+    standard = _standard_gate_names()
+    return {
+        instruction.operation.name
+        for instruction in circuit.data
+        if instruction.operation.name not in standard
+        and instruction.operation.name not in _SKIPPED_OPS
+        and not getattr(instruction.operation, "_directive", False)
+    }
+
+
+def expand_custom_gates(circuit: Any) -> Any:
+    """The circuit with custom gates (to_gate(), initialize, ...) replaced by standard gates."""
+    custom = _custom_operations(circuit)
+    for _ in range(_MAX_EXPAND_ROUNDS):
+        if not custom:
+            return circuit
+        try:
+            expanded = circuit.decompose(gates_to_decompose=sorted(custom))
+        except Exception:  # noqa: BLE001 - reported below as an operation the grader cannot expand
+            break
+        expanded_custom = _custom_operations(expanded)
+        if expanded_custom == custom and len(expanded.data) == len(circuit.data):
+            break
+        circuit, custom = expanded, expanded_custom
+    if not custom:
+        return circuit
+    raise AnswerError(
+        f"Your circuit uses {', '.join(repr(name) for name in sorted(custom))}, which the grader "
+        "cannot expand into standard gates. Build the circuit from standard gates such as h, x and cx."
+    )
+
+
 def circuit_facts(circuit: Any) -> dict[str, Any]:
-    """Qubit count, depth and the qubits of every multi-qubit gate."""
+    """Qubit count, depth and the qubits of every multi-qubit gate, after expanding custom gates."""
+    circuit = expand_custom_gates(circuit)
     multi: list[list[int]] = []
     for instruction in circuit.data:
         operation = instruction.operation
         if operation.name in _SKIPPED_OPS or getattr(operation, "_directive", False):
             continue
-        if len(instruction.qubits) >= 2 and len(multi) < MAX_GATES:
+        if len(instruction.qubits) >= 2:
+            if len(multi) >= MAX_GATES:
+                raise AnswerError(
+                    f"Your circuit has more than {MAX_GATES} multi-qubit gates. Simplify it and try again."
+                )
             multi.append([circuit.find_bit(qubit).index for qubit in instruction.qubits])
     return {"num_qubits": circuit.num_qubits, "depth": circuit.depth(), "multi": multi}
 
