@@ -1,0 +1,53 @@
+name: publish
+
+# Publishes to PyPI when a tag such as v0.2.0 is pushed. Uses PyPI Trusted Publishing,
+# so no token is stored anywhere: PyPI trusts this workflow in the "pypi" environment.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install ".[test]" build
+      - name: Check that the tag matches the package version
+        run: |
+          python - <<'EOF'
+          import os, tomllib, qfest_grader
+          tag = os.environ["GITHUB_REF_NAME"]
+          version = tomllib.load(open("pyproject.toml", "rb"))["project"]["version"]
+          assert tag == f"v{version}" == f"v{qfest_grader.__version__}", (tag, version, qfest_grader.__version__)
+          EOF
+      - run: pytest -q
+      - run: python -m build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/qfest-grader/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
