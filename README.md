@@ -38,14 +38,20 @@ Each grade call sends your email and a small summary of your answer to the gradi
 
 - counts, numbers and dictionaries as they are;
 - statevectors as their non-zero amplitudes;
-- circuits as their qubit count, depth, the qubits of each multi-qubit gate and their final state.
+- circuits as their qubit count, depth, the qubits of each multi-qubit gate and their final state;
+- runtime options as the settings the exercise checks;
+- job results as the values the exercise checks;
+- functions as their outputs on fixed test inputs;
+- long lists of numbers as a SHA-256 digest.
 
-Circuit source code and notebook contents are never sent. The email is stored in `~/.qfest/grader.json`, readable only by you.
+Source code and notebook contents are never sent. The email is stored in `~/.qfest/grader.json`, readable only by you.
+
+Some checks run on your machine before sending. Lab 4a Exercise 3c compares your circuit with `annotated_qaoa_ansatz` of your Hamiltonian. Lab 4b Exercise 1b transpiles a test circuit on `FakeMiami`. The Lab 4b bonus recomputes the energy of your subspace, which takes up to two minutes.
 
 ## Develop
 
 ```bash
-pip install -e ".[test]"
+pip install -e ".[test,labs]"
 pytest
 ```
 

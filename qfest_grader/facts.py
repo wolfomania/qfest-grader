@@ -115,6 +115,30 @@ def dynamic_circuit_facts(circuit: Any) -> dict[str, Any]:
     }
 
 
+def unroll_boxes(circuit: Any) -> Any:
+    """The circuit with every box replaced by its body; other operations unchanged."""
+    try:
+        from qiskit.circuit import BoxOp
+    except ImportError:  # Qiskit 1.x has no boxes
+        return circuit
+
+    if not any(isinstance(inst.operation, BoxOp) for inst in circuit.data):
+        return circuit
+    flat = circuit.copy_empty_like()
+
+    def emit(block: Any, qubits: list[Any], clbits: list[Any]) -> None:
+        for inst in block.data:
+            inner_qubits = [qubits[block.find_bit(bit).index] for bit in inst.qubits]
+            inner_clbits = [clbits[block.find_bit(bit).index] for bit in inst.clbits]
+            if isinstance(inst.operation, BoxOp):
+                emit(inst.operation.body, inner_qubits, inner_clbits)
+            else:
+                flat.append(inst.operation, inner_qubits, inner_clbits)
+
+    emit(circuit, list(circuit.qubits), list(circuit.clbits))
+    return flat
+
+
 def undirected_edges(edges: Any, what: str) -> list[list[int]]:
     """A coupling map, EdgeList or list of pairs as sorted unique [low, high] pairs."""
     if hasattr(edges, "get_edges"):  # CouplingMap
