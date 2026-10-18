@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qfest-grader"
-version = "0.1.0"
+version = "0.1.1"
 description = "Grader client for the Qiskit Fall Fest 2026 Warsaw lab notebooks"
 readme = "README.md"
 license = "Apache-2.0"

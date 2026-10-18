@@ -14,7 +14,7 @@ Set up once per environment::
 Then call the ``grade_labN_exM`` functions from ``qfest_grader.challenges.warsaw_2026``.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 from qfest_grader.account import AccountError, save_account, saved_email  # noqa: E402
 from qfest_grader.challenges.warsaw_2026 import check_progress  # noqa: E402
