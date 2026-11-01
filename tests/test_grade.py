@@ -48,6 +48,12 @@ def test_grade_reports_failure(account, capsys):
     assert "Please review your answer" in out
 
 
+def test_closed_grader_message_is_printed_alone(account, capsys):
+    account.reply = {"passed": False, "score": 0.0, "msg": "The event has ended.", "closed": True}
+    grade_lab0_ex1()
+    assert capsys.readouterr().out == "Grading your answer. Please wait...\n\nThe event has ended.\n"
+
+
 def test_invalid_answer_is_reported_without_network(account, capsys):
     grade_lab0_ex3([0.1, 0.2])
     assert account.calls == []

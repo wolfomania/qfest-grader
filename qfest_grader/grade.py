@@ -94,6 +94,10 @@ def grade_answer(
             "%pip install -U qfest-grader"
         )
         return
+    # The server sets closed when it accepts no submissions.
+    if response.get("closed") is True:
+        print(response["msg"])
+        return
     print(determine_grade_response(passed=response["passed"], score=response["score"], msg=response["msg"]))
 
 
